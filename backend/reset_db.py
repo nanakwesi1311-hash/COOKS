@@ -1,7 +1,7 @@
 import os
 from utils.db_utils import init_db
 
-db_path = os.path.join("C:/Users/KAY/Desktop/COOKS/backend/database.db")
+db_path = os.path.join("C:\Users\Nana Kwesi\Desktop\COOKS\backend\database.db")
 
 # Delete the existing DB file
 if os.path.exists(db_path):

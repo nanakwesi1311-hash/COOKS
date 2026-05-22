@@ -10,7 +10,7 @@ import json
 import os
 
 # Load dataset
-df = pd.read_csv("C:/Users/KAY/Desktop/COOKS/Disease_symptom_and_patient_profile_dataset.csv")
+df = pd.read_csv("Disease_symptom_and_patient_profile_dataset.csv")
 
 # Drop 'Outcome Variable' if present
 df.drop(columns=['Outcome Variable'], inplace=True, errors='ignore')
@@ -57,3 +57,6 @@ with open("backend/model/prescriptions.json", "w") as f:
     json.dump(prescriptions, f)
 
 print("Model, encoders, and prescriptions saved successfully.")
+
+
+

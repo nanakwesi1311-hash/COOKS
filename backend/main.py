@@ -1,4 +1,5 @@
 from fastapi import FastAPI, HTTPException, Depends
+import os
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from typing import Dict
@@ -18,7 +19,20 @@ from utils.db_utils import (
     get_all_patients_from_db,
     delete_user_from_db,
     delete_patient_from_db,
-    register_admin
+    update_patient_in_db,
+    register_admin,
+    log_activity,
+    get_activity_logs,
+    get_system_updates,
+    add_system_update,
+    get_analytics_data,
+    init_files_db,
+    add_patient_file,
+    get_patient_files,
+    init_notifications_db,
+    create_notification,
+    get_notifications,
+    mark_notifications_read
 )
 
 app = FastAPI()
@@ -31,7 +45,18 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+from fastapi.staticfiles import StaticFiles
+import shutil
+
+UPLOAD_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "uploads")
+if not os.path.exists(UPLOAD_DIR):
+    os.makedirs(UPLOAD_DIR)
+
+app.mount("/uploads", StaticFiles(directory=UPLOAD_DIR), name="uploads")
+
 init_db()
+init_files_db()
+init_notifications_db()
 register_admin()
 
 class TokenRequest(BaseModel):
@@ -65,13 +90,39 @@ def login(request: TokenRequest):
     if not user:
         raise HTTPException(status_code=400, detail="Invalid credentials")
     access_token = create_access_token(data={"sub": user["username"], "role": user["role"]})
+    log_activity(user["username"], "login")
+    if user["role"] != "admin":
+        create_notification(f"Doctor {user['username']} logged into the system", "login")
     return {"access_token": access_token, "token_type": "bearer"}
+
+@app.post("/logout")
+def logout(current_user: dict = Depends(get_current_user)):
+    log_activity(current_user["username"], "logout")
+    return {"message": "Logged out successfully"}
 
 @app.post("/predict")
 def predict_endpoint(request: PredictionRequest, current_user: dict = Depends(get_current_user)):
+    from utils.db_utils import get_patient_by_id
+    patient = get_patient_by_id(request.patient_id)
+    if patient:
+        request.data["Age"] = str(patient["age"])
+        request.data["Gender"] = patient["gender"]
+
     disease, prescription = predict_disease_and_prescription(request.data)
-    save_diagnosis(request.patient_id, current_user["username"], request.data, disease, prescription)
-    return {"disease": disease, "prescription": prescription}
+    # save_diagnosis is removed from here to allow "Save or Trash" on frontend
+    return {"disease": disease, "prescription": prescription, "message": "Clinical decision support analysis complete."}
+
+class SaveDiagnosisRequest(BaseModel):
+    patient_id: int
+    data: Dict[str, str]
+    disease: str
+    prescription: str
+
+@app.post("/save-diagnosis")
+def save_diagnosis_endpoint(request: SaveDiagnosisRequest, current_user: dict = Depends(get_current_user)):
+    save_diagnosis(request.patient_id, current_user["username"], request.data, request.disease, request.prescription)
+    create_notification(f"New decision support analysis saved by Dr. {current_user['username']}", "diagnosis")
+    return {"message": "Decision support data saved successfully"}
 
 @app.post("/patients")
 def add_patient(patient: PatientRequest, current_user: dict = Depends(get_current_user)):
@@ -82,6 +133,29 @@ def add_patient(patient: PatientRequest, current_user: dict = Depends(get_curren
 @app.get("/patients")
 def list_patients(current_user: dict = Depends(get_current_user)):
     return get_patients(current_user["username"])
+
+@app.put("/patients/{patient_id}")
+def update_patient(patient_id: int, patient: PatientRequest, current_user: dict = Depends(get_current_user)):
+    # Check if the user is a doctor or admin (main.py assumes current_user is valid)
+    success = update_patient_in_db(patient_id, patient.name, patient.age, patient.gender)
+    if not success:
+        raise HTTPException(status_code=404, detail="Patient not found or update failed")
+    return {"message": "Patient updated successfully"}
+
+from fastapi import UploadFile, File
+
+@app.post("/patients/{patient_id}/upload")
+async def upload_file(patient_id: int, file: UploadFile = File(...), current_user: dict = Depends(get_current_user)):
+    file_path = os.path.join(UPLOAD_DIR, f"{patient_id}_{file.filename}")
+    with open(file_path, "wb") as buffer:
+        shutil.copyfileobj(file.file, buffer)
+    
+    add_patient_file(patient_id, file.filename, f"/uploads/{patient_id}_{file.filename}")
+    return {"message": "File uploaded successfully"}
+
+@app.get("/patients/{patient_id}/files")
+def list_files(patient_id: int, current_user: dict = Depends(get_current_user)):
+    return get_patient_files(patient_id)
 
 @app.get("/history/{patient_id}")
 def get_history(patient_id: int, current_user: dict = Depends(get_current_user)):
@@ -99,11 +173,34 @@ def admin_patients(current_user: dict = Depends(get_current_user)):
         raise HTTPException(status_code=403, detail="Not authorized")
     return get_all_patients_from_db()
 
-@app.get("/admin/diagnoses")
-def admin_diagnoses(current_user: dict = Depends(get_current_user)):
+@app.get("/admin/logs")
+def get_logs(current_user: dict = Depends(get_current_user)):
     if current_user["role"] != "admin":
-        raise HTTPException(status_code=403, detail="Not authorized")
-    return get_all_diagnoses()
+        raise HTTPException(status_code=403, detail="Admin access required")
+    return get_activity_logs()
+
+@app.get("/admin/system-updates")
+def list_system_updates(current_user: dict = Depends(get_current_user)):
+    if current_user["role"] != "admin":
+        raise HTTPException(status_code=403, detail="Admin access required")
+    return get_system_updates()
+
+class SystemUpdateRequest(BaseModel):
+    title: str
+    description: str
+
+@app.post("/admin/system-updates")
+def post_system_update(update: SystemUpdateRequest, current_user: dict = Depends(get_current_user)):
+    if current_user["role"] != "admin":
+        raise HTTPException(status_code=403, detail="Admin access required")
+    add_system_update(update.title, update.description)
+    return {"message": "Update posted successfully"}
+
+@app.get("/admin/analytics")
+def get_admin_analytics(current_user: dict = Depends(get_current_user)):
+    if current_user["role"] != "admin":
+        raise HTTPException(status_code=403, detail="Admin access required")
+    return get_analytics_data()
 
 @app.delete("/admin/users/{username}")
 def delete_user(username: str, current_user: dict = Depends(get_current_user)):
@@ -119,6 +216,19 @@ def delete_patient(patient_id: int, current_user: dict = Depends(get_current_use
         raise HTTPException(status_code=403, detail="Not authorized")
     return delete_patient_from_db(patient_id)
 
+@app.get("/admin/notifications")
+def list_notifications(current_user: dict = Depends(get_current_user)):
+    if current_user["role"] != "admin":
+        raise HTTPException(status_code=403, detail="Admin access required")
+    return get_notifications()
+
+@app.post("/admin/notifications/read")
+def read_notifications(current_user: dict = Depends(get_current_user)):
+    if current_user["role"] != "admin":
+        raise HTTPException(status_code=403, detail="Admin access required")
+    mark_notifications_read()
+    return {"message": "Notifications marked as read"}
+
 @app.get("/")
 def root():
-    return {"message": "Disease diagnosis system is running."}
+    return {"message": "Clinical decision support system is running."}

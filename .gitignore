@@ -1,1 +1,42 @@
-node_modules
+# Dependency directories
+node_modules/
+jspm_packages/
+web_modules/
+
+# Python virtual environments and caches
+venv/
+backend/venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+.ipynb_checkpoints/
+
+# IDEs and Editors
+.vscode/
+.idea/
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+
+# Expo / React Native
+.expo/
+dist/
+web-build/
+
+# Local env files and databases
+.env
+backend/.env
+*.db
+*.sqlite
+
+# OS files
+Thumbs.db
+Desktop.ini
+.DS_Store
+
+# Large archive files
+*.zip
+*.tar.gz
+*.rar

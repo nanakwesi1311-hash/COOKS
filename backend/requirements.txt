@@ -1,0 +1,9 @@
+fastapi
+uvicorn
+pydantic
+python-dotenv
+google-genai
+PyJWT
+passlib[bcrypt]
+bcrypt==3.2.2
+python-multipart

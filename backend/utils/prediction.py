@@ -4,9 +4,9 @@ import os
 import pandas as pd
 
 # Paths
-model_path = os.path.join("C:/Users/KAY/Desktop/COOKS/backend/model/disease_predictor_model.pkl")
-encoders_path = os.path.join("C:/Users/KAY/Desktop/COOKS/backend/model/label_encoders.pkl")
-prescriptions_path = os.path.join("C:/Users/KAY/Desktop/COOKS/backend/model/prescriptions.json")
+model_path = os.path.join("C:\Users\Nana Kwesi\Desktop\COOKS\backend\model\disease_predictor_model.pkl")
+encoders_path = os.path.join("C:\Users\Nana Kwesi\Desktop\COOKS\backend\model\label_encoders.pkl")
+prescriptions_path = os.path.join("C:\Users\Nana Kwesi\Desktop\COOKS\backend\model\prescriptions.json")
 
 # Load model and encoders
 model = joblib.load(model_path)

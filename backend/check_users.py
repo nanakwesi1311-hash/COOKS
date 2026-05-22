@@ -1,7 +1,7 @@
 # check_users.py
 import sqlite3
 
-conn = sqlite3.connect("C:/Users/KAY/Desktop/COOKS/backend/database.db")  # path must match your actual db
+conn = sqlite3.connect("C:\Users\Nana Kwesi\Desktop\COOKS\backend/database.db")  # path must match your actual db
 cursor = conn.cursor()
 
 cursor.execute("SELECT username, password FROM users")

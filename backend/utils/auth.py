@@ -7,7 +7,7 @@ from fastapi.security import OAuth2PasswordBearer
 from utils.db_utils import get_user_by_username
 from passlib.context import CryptContext
 
-SECRET_KEY = "your-secret-key"
+SECRET_KEY = "super_secure_and_long_jwt_secret_key_for_idcds_system_2026"
 ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_MINUTES = 60
 
